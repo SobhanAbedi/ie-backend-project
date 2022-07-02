@@ -29,9 +29,15 @@ func NewRouter(port uint, basePath string, courseHandler *handler.CourseHandler,
 	r.app.POST(r.bp+"/register", r.controller.Register)
 	r.app.POST(r.bp+"/login", r.controller.Login)
 	r.app.POST(r.bp+"/logout", r.controller.Logout)
-	r.app.POST(r.bp+"/new-course", r.controller.NewCourse)
-	r.app.GET(r.bp+"/get-course/:id", r.controller.GetCourse)
-	r.app.GET(r.bp+"/delete-course/:id", r.controller.DeleteCourse)
+	r.app.POST(r.bp+"/course/new", r.controller.NewCourse)
+	r.app.POST(r.bp+"/course/delete", r.controller.DeleteCourse)
+	r.app.GET(r.bp+"/course/:id", r.controller.GetCourse)
+	r.app.POST(r.bp+"/student/new", r.controller.NewStudent)
+	r.app.POST(r.bp+"/student/delete", r.controller.DeleteStudent)
+	r.app.POST(r.bp+"/student/update/score", r.controller.UpdateStudentScore)
+	r.app.POST(r.bp+"/student/update/email", r.controller.UpdateStudentEmail)
+	r.app.GET(r.bp+"/student/:id", r.controller.GetStudent)
+
 	//app.Get("/api/user", controllers.User)
 
 	return &r, nil

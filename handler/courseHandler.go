@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"ie-backend-project/common"
@@ -15,12 +14,12 @@ type CourseHandler struct {
 func NewCourseHandler(dsn string) (*CourseHandler, error) {
 	db, err := gorm.Open(sqlite.Open("db/"+dsn), &gorm.Config{})
 	if err != nil {
-		return nil, errors.New("database connection failed")
+		return nil, common.DBConnectionFailedError
 	}
 
 	err = db.AutoMigrate(&model.Course{})
 	if err != nil {
-		return nil, errors.New("course model migration failed")
+		return nil, common.CourseMMFailedError
 	}
 
 	handler := CourseHandler{db}
@@ -30,7 +29,7 @@ func NewCourseHandler(dsn string) (*CourseHandler, error) {
 func (h CourseHandler) NewCourse(name, instructor string) (*model.Course, error) {
 	newCourse := model.Course{Name: name, Instructor: instructor}
 	if h.Exists(newCourse) {
-		return nil, errors.New("duplicate course")
+		return nil, common.DuplicateCourseError
 	}
 	res := h.db.Create(&newCourse)
 	if res.Error != nil {
@@ -57,7 +56,6 @@ func (h CourseHandler) GetCourse(id uint) (*model.Course, error) {
 		return course, nil
 	}
 	return nil, common.CourseNotFoundError
-
 }
 
 func (h CourseHandler) DeleteCourse(id uint) error {
