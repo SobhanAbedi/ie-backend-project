@@ -74,7 +74,7 @@ func (h StudentHandler) GetStudent(id uint) (*model.Student, error) {
 	if course.ID == 0 {
 		h.db.Delete(&model.Student{}, std.ID)
 		fmt.Println("Deleted Student", std.ID)
-		return nil, common.StudentClassError
+		return nil, common.StudentCourseError
 	}
 	std.Course = *course
 	return std, nil
@@ -88,7 +88,7 @@ func (h StudentHandler) UpdateStudentScore(id, newScore uint) error {
 	if err != nil {
 		return err
 	}
-	h.db.Model(std).Update("Score", newScore)
+	h.db.Model(std).Update("score", newScore)
 	return nil
 }
 
@@ -100,7 +100,7 @@ func (h StudentHandler) UpdateStudentEmail(id uint, newEmail string) error {
 	if err != nil {
 		return err
 	}
-	h.db.Model(std).Update("Email", newEmail)
+	h.db.Model(std).Update("email", newEmail)
 	return nil
 }
 

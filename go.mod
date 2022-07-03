@@ -3,6 +3,8 @@ module ie-backend-project
 go 1.18
 
 require (
+	github.com/emersion/go-sasl v0.0.0-20211008083017-0b9dcfb154ac
+	github.com/emersion/go-smtp v0.15.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/labstack/echo/v4 v4.7.2
 	gorm.io/driver/sqlite v1.3.5

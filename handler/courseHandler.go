@@ -68,6 +68,35 @@ func (h CourseHandler) DeleteCourse(id uint) error {
 	return nil
 }
 
+func (h CourseHandler) UpdateCourseInstructor(id uint, newInstructor string) error {
+	if newInstructor == "" {
+		return common.InvalidInstructorError
+	}
+	std, err := h.GetCourse(id)
+	if err != nil {
+		return err
+	}
+	h.db.Model(std).Update("instructor", newInstructor)
+	return nil
+}
+
+func (h CourseHandler) GetStudents(id uint) ([]model.Student, error) {
+	course := new(model.Course)
+	h.db.Limit(1).Find(course, id)
+	if course.ID == 0 {
+		return nil, common.CourseNotFoundError
+	}
+	students := new([]model.Student)
+	res := h.db.Where("course_id = ?", id).Find(students)
+	if res.Error != nil {
+		return nil, common.CourseStudentsError
+	}
+	for i := 0; i < len(*students); i++ {
+		(*students)[i].Course = *course
+	}
+	return *students, nil
+}
+
 func (h CourseHandler) Exists(course model.Course) bool {
 	foundOne := new(model.Course)
 	h.db.Where(&model.Course{Name: course.Name, Instructor: course.Instructor}).Limit(1).Find(foundOne)

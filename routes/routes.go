@@ -7,16 +7,17 @@ import (
 	"ie-backend-project/common"
 	"ie-backend-project/controller"
 	"ie-backend-project/handler"
+	"ie-backend-project/mailer"
 	"strconv"
 )
 
-func NewRouter(port uint, basePath string, courseHandler *handler.CourseHandler, studentHandler *handler.StudentHandler) error {
+func NewRouter(port uint, basePath string, courseHandler *handler.CourseHandler, studentHandler *handler.StudentHandler, studentMailer mailer.Mailer) error {
 	if port < 1000 || port > 65535 {
 		return errors.New("unacceptable port num")
 	}
 
 	e := echo.New()
-	c := controller.NewController(courseHandler, studentHandler)
+	c := controller.NewController(courseHandler, studentHandler, studentMailer)
 
 	e.POST(basePath+"/register", c.Register)
 	e.POST(basePath+"/login", c.Login)
@@ -33,7 +34,10 @@ func NewRouter(port uint, basePath string, courseHandler *handler.CourseHandler,
 
 	cg.POST("/new", c.NewCourse)
 	cg.POST("/delete", c.DeleteCourse)
+	cg.POST("/announce", c.AnnounceCourseResults)
+	cg.POST("/update/instructor", c.UpdateCourseInstructor)
 	cg.GET("/:id", c.GetCourse)
+	cg.GET("/:id/students", c.GetCourseStudents)
 	sg.POST("/new", c.NewStudent)
 	sg.POST("/delete", c.DeleteStudent)
 	sg.POST("/update/score", c.UpdateStudentScore)

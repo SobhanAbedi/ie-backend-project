@@ -7,19 +7,23 @@ import (
 	"github.com/labstack/echo/v4"
 	"ie-backend-project/common"
 	"ie-backend-project/handler"
+	"ie-backend-project/mailer"
 	"ie-backend-project/model"
 	"net/http"
 	"strconv"
 	"time"
 )
 
+const mailsPerMailer = 5
+
 type Controller struct {
 	ch *handler.CourseHandler
 	sh *handler.StudentHandler
+	sm mailer.Mailer
 }
 
-func NewController(courseHandler *handler.CourseHandler, studentHandler *handler.StudentHandler) *Controller {
-	controller := Controller{ch: courseHandler, sh: studentHandler}
+func NewController(courseHandler *handler.CourseHandler, studentHandler *handler.StudentHandler, studentMailer mailer.Mailer) *Controller {
+	controller := Controller{ch: courseHandler, sh: studentHandler, sm: studentMailer}
 	return &controller
 }
 
@@ -98,6 +102,84 @@ func (h Controller) DeleteCourse(c echo.Context) error {
 	return c.JSON(http.StatusOK, common.Success{Note: "Course deleted"})
 }
 
+func (h Controller) GetCourseStudents(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Invalid ID structure. ID should be positive integer"})
+	}
+
+	res, err := h.ch.GetStudents(uint(id))
+	if err != nil {
+		if errors.Is(err, common.CourseNotFoundError) {
+			return c.JSON(http.StatusNotFound, common.Error{Note: "Couldn't find requested course"})
+		}
+		if errors.Is(err, common.CourseStudentsError) {
+			return c.JSON(http.StatusExpectationFailed, common.Error{Note: "Error while trying to retrieve course students"})
+		}
+	}
+	return c.JSON(http.StatusOK, model.Students{Students: res})
+}
+
+func (h Controller) AnnounceCourseResults(c echo.Context) error {
+	id := new(common.ID)
+	if err := c.Bind(id); err != nil || id.ID == 0 {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad ID Json. ID should be a positive integer"})
+	}
+
+	res, err := h.ch.GetStudents(id.ID)
+	if err != nil {
+		if errors.Is(err, common.CourseNotFoundError) {
+			return c.JSON(http.StatusNotFound, common.Error{Note: "Couldn't find requested course"})
+		}
+		if errors.Is(err, common.CourseStudentsError) {
+			return c.JSON(http.StatusExpectationFailed, common.Error{Note: "Error while trying to retrieve course students"})
+		}
+	}
+
+	r := common.Results{Results: make([]interface{}, len(res))}
+	mailerCount := len(res) / mailsPerMailer
+	if mailerCount*mailsPerMailer < len(res) {
+		mailerCount++
+	}
+	//rs := make([]common.Results, mailerCount)
+	ch := make(chan int)
+	for i := 0; i < mailerCount; i++ {
+		beg := i * mailsPerMailer
+		end := (i + 1) * mailsPerMailer
+		if end > len(res) {
+			end = len(res)
+		}
+		go h.sm.SendMails(res[beg:end], r.Results[beg:end], ch)
+		println("Started Mailer", i)
+	}
+	for i := 0; i < mailerCount; i++ {
+		println("Waiting on Mailer", i)
+		<-ch
+		//r.Results = append(r.Results, (<-ch[i]).Results)
+		println("Got the results from Mailer", i)
+	}
+	return c.JSON(http.StatusOK, r)
+}
+
+func (h Controller) UpdateCourseInstructor(c echo.Context) error {
+	type CourseInstructor struct {
+		ID         uint   `json:"id"`
+		Instructor string `json:"instructor"`
+	}
+	data := new(CourseInstructor)
+	if err := c.Bind(data); err != nil || data.ID == 0 || data.Instructor == "" {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. ID should be positive integer"})
+	}
+
+	if err := h.ch.UpdateCourseInstructor(data.ID, data.Instructor); err != nil {
+		if err == common.InvalidInstructorError {
+			return c.JSON(http.StatusBadRequest, common.Error{Note: "Instructor name is required"})
+		}
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Course not Found"})
+	}
+	return c.JSON(http.StatusOK, common.Success{Note: "Course instructor updated"})
+}
+
 func (h Controller) NewStudent(c echo.Context) error {
 	students := new(model.Students)
 	if err := c.Bind(students); err != nil {
@@ -147,7 +229,7 @@ func (h Controller) GetStudent(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, common.Error{Note: "Invalid ID structure. ID should be positive integer"})
 	}
 	res, err := h.sh.GetStudent(uint(id))
-	if errors.Is(err, common.StudentNotFoundError) || errors.Is(err, common.StudentClassError) {
+	if errors.Is(err, common.StudentNotFoundError) || errors.Is(err, common.StudentCourseError) {
 		return c.JSON(http.StatusNotFound, common.Error{Note: "Couldn't find requested student"})
 	}
 	return c.JSON(http.StatusOK, res)

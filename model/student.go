@@ -16,7 +16,7 @@ type Student struct {
 }
 
 func (s Student) String() string {
-	return fmt.Sprintf("%s %s from %s class witdh a score of %d", s.FirstName, s.LastName, s.Course.Name, s.Score)
+	return fmt.Sprintf("%s %s scored %d in %s course by %s", s.FirstName, s.LastName, s.Score, s.Course.Name, s.Course.Instructor)
 }
 
 type Students struct {
