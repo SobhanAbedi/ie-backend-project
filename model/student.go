@@ -7,12 +7,12 @@ import (
 
 type Student struct {
 	gorm.Model
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Score     int    `json:"score"`
-	CourseID  uint   `json:"course_id"`
-	Course    Course `json:"course"`
+	FirstName string `json:"first_name" validate:"required"`
+	LastName  string `json:"last_name" validate:"required"`
+	Email     string `json:"email" validate:"required,email"`
+	Score     int    `json:"score" validate:"gte=0,lte=20"`
+	CourseID  uint   `json:"course_id" validate:"required"`
+	Course    Course `json:"course" validate:"-"`
 }
 
 func (s Student) String() string {
@@ -20,5 +20,5 @@ func (s Student) String() string {
 }
 
 type Students struct {
-	Students []Student `json:"students"`
+	Students []Student `json:"students" validate:"required"`
 }

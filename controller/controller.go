@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"ie-backend-project/common"
@@ -20,10 +21,11 @@ type Controller struct {
 	ch *handler.CourseHandler
 	sh *handler.StudentHandler
 	sm mailer.Mailer
+	v  *validator.Validate
 }
 
 func NewController(courseHandler *handler.CourseHandler, studentHandler *handler.StudentHandler, studentMailer mailer.Mailer) *Controller {
-	controller := Controller{ch: courseHandler, sh: studentHandler, sm: studentMailer}
+	controller := Controller{ch: courseHandler, sh: studentHandler, sm: studentMailer, v: validator.New()}
 	return &controller
 }
 
@@ -33,11 +35,13 @@ func (h Controller) Register(c echo.Context) error {
 
 func (h Controller) Login(c echo.Context) error {
 	type Name struct {
-		Name string `json:"name"`
-		Pass string `json:"password"`
+		Name string `json:"name" validate:"required"`
+		Pass string `json:"pass" validate:"required"`
 	}
 	data := new(Name)
-	if err := c.Bind(data); err != nil || data.Name == "" {
+	bindErr := c.Bind(data)
+	parseErr := h.v.Struct(data)
+	if bindErr != nil || parseErr != nil {
 		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. Name shouldn't be empty"})
 	}
 
@@ -58,12 +62,10 @@ func (h Controller) Logout(c echo.Context) error {
 
 func (h Controller) NewCourse(c echo.Context) error {
 	course := new(model.Course)
-	if err := c.Bind(course); err != nil {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Course Json"})
-	}
-
-	if course.Name == "" || course.Instructor == "" {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Not all the course fields are provided"})
+	bindErr := c.Bind(course)
+	parseErr := h.v.Struct(course)
+	if bindErr != nil || parseErr != nil {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Course Json, All the course fields are provided"})
 	}
 
 	res, err := h.ch.AddCourse(*course)
@@ -91,7 +93,9 @@ func (h Controller) GetCourse(c echo.Context) error {
 
 func (h Controller) DeleteCourse(c echo.Context) error {
 	id := new(common.ID)
-	if err := c.Bind(id); err != nil || id.ID == 0 {
+	bindErr := c.Bind(id)
+	parseErr := h.v.Struct(id)
+	if bindErr != nil || parseErr != nil {
 		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad ID Json. ID should be a positive integer"})
 	}
 
@@ -122,7 +126,9 @@ func (h Controller) GetCourseStudents(c echo.Context) error {
 
 func (h Controller) AnnounceCourseResults(c echo.Context) error {
 	id := new(common.ID)
-	if err := c.Bind(id); err != nil || id.ID == 0 {
+	bindErr := c.Bind(id)
+	parseErr := h.v.Struct(id)
+	if bindErr != nil || parseErr != nil {
 		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad ID Json. ID should be a positive integer"})
 	}
 
@@ -163,11 +169,13 @@ func (h Controller) AnnounceCourseResults(c echo.Context) error {
 
 func (h Controller) UpdateCourseInstructor(c echo.Context) error {
 	type CourseInstructor struct {
-		ID         uint   `json:"id"`
-		Instructor string `json:"instructor"`
+		ID         uint   `json:"id" validate:"required"`
+		Instructor string `json:"instructor" validate:"required"`
 	}
 	data := new(CourseInstructor)
-	if err := c.Bind(data); err != nil || data.ID == 0 || data.Instructor == "" {
+	bindErr := c.Bind(data)
+	parseErr := h.v.Struct(data)
+	if bindErr != nil || parseErr != nil {
 		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. ID should be positive integer"})
 	}
 
@@ -182,13 +190,15 @@ func (h Controller) UpdateCourseInstructor(c echo.Context) error {
 
 func (h Controller) NewStudent(c echo.Context) error {
 	students := new(model.Students)
-	if err := c.Bind(students); err != nil {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Students Json"})
+	bindErr := c.Bind(students)
+	parseErr := h.v.Struct(students)
+	if bindErr != nil || parseErr != nil {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Students Json. All fields should be filled"})
 	}
 
 	r := common.Results{Results: make([]interface{}, 0, len(students.Students))}
 	for _, student := range students.Students {
-		if student.FirstName == "" || student.LastName == "" || student.Email == "" || student.CourseID == 0 {
+		if parseErr1 := h.v.Struct(student); parseErr1 != nil {
 			r.Results = append(r.Results, common.Error{Note: "Not all the student fields are provided"})
 			continue
 		}
@@ -237,12 +247,14 @@ func (h Controller) GetStudent(c echo.Context) error {
 
 func (h Controller) UpdateStudentScore(c echo.Context) error {
 	type StudentScore struct {
-		ID    uint `json:"id"`
-		Score uint `json:"score"`
+		ID    uint `json:"id" validate:"required"`
+		Score uint `json:"score" validate:"gte=0,lte=20"`
 	}
 	data := new(StudentScore)
-	if err := c.Bind(data); err != nil || data.ID == 0 {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. ID should be positive integer"})
+	bindErr := c.Bind(data)
+	parseErr := h.v.Struct(data)
+	if bindErr != nil || parseErr != nil {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. ID should be positive integer and score should be between 0 an 20"})
 	}
 
 	if err := h.sh.UpdateStudentScore(data.ID, data.Score); err != nil {
@@ -256,12 +268,14 @@ func (h Controller) UpdateStudentScore(c echo.Context) error {
 
 func (h Controller) UpdateStudentEmail(c echo.Context) error {
 	type StudentEmail struct {
-		ID    uint   `json:"id"`
-		Email string `json:"email"`
+		ID    uint   `json:"id" validate:"required"`
+		Email string `json:"email" validate:"required,email"`
 	}
 	data := new(StudentEmail)
-	if err := c.Bind(data); err != nil || data.ID == 0 {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. ID should be positive integer"})
+	bindErr := c.Bind(data)
+	parseErr := h.v.Struct(data)
+	if bindErr != nil || parseErr != nil {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Json. ID should be positive integer and Email should be valid"})
 	}
 
 	if err := h.sh.UpdateStudentEmail(data.ID, data.Email); err != nil {
@@ -274,11 +288,14 @@ func (h Controller) UpdateStudentEmail(c echo.Context) error {
 }
 
 func (h Controller) DeleteStudent(c echo.Context) error {
-	id, err := strconv.Atoi(c.FormValue("id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Invalid ID structure. ID should be positive integer"})
+	id := new(common.ID)
+	bindErr := c.Bind(id)
+	parseErr := h.v.Struct(id)
+	if bindErr != nil || parseErr != nil {
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad ID Json. ID should be a positive integer"})
 	}
-	if err := h.sh.DeleteStudent(uint(id)); errors.Is(err, common.StudentNotFoundError) {
+
+	if err := h.sh.DeleteStudent(id.ID); errors.Is(err, common.StudentNotFoundError) {
 		return c.JSON(http.StatusNotFound, common.Error{Note: "Couldn't find requested student"})
 	}
 	return c.JSON(http.StatusOK, common.Success{Note: "Student Deleted"})

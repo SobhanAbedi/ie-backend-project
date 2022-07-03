@@ -7,8 +7,8 @@ import (
 
 type Course struct {
 	gorm.Model
-	Name       string `json:"name"`
-	Instructor string `json:"instructor"`
+	Name       string `json:"name" validate:"required"`
+	Instructor string `json:"instructor" validate:"required"`
 }
 
 func (c Course) String() string {

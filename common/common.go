@@ -33,7 +33,7 @@ type Token struct {
 }
 
 type ID struct {
-	ID uint `json:"id"`
+	ID uint `json:"id" validate:"required"`
 }
 
 type Results struct {
