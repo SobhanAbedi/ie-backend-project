@@ -1,6 +1,9 @@
 package common
 
-import "errors"
+import (
+	"errors"
+	"github.com/golang-jwt/jwt"
+)
 
 var DBConnectionFailedError = errors.New("database connection failed")
 
@@ -23,6 +26,10 @@ type Success struct {
 	Note string `json:"msg"`
 }
 
+type Token struct {
+	Token string `json:"token"`
+}
+
 type ID struct {
 	ID uint `json:"id"`
 }
@@ -30,3 +37,10 @@ type ID struct {
 type Results struct {
 	Results []interface{} `json:"results"`
 }
+
+type JWTCustomClaims struct {
+	Name string `json:"name"`
+	jwt.StandardClaims
+}
+
+var JWTKey = []byte("my_surprisingly_secret_key")

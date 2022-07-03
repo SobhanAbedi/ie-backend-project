@@ -28,6 +28,5 @@ func main() {
 	//studentHandler.DeleteStudent(updatedStd.ID)
 	//courseHandler.DeleteCourse(ieCourse.ID)
 	//courseHandler.DeleteCourse(osCourse.ID)
-	router := safe(routes.NewRouter(8080, "/api", courseHandler, studentHandler))
-	safe(0, router.Start())
+	safe(0, routes.NewRouter(8080, "/api", courseHandler, studentHandler))
 }

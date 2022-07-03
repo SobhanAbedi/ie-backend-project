@@ -22,13 +22,3 @@ func (s Student) String() string {
 type Students struct {
 	Students []Student `json:"students"`
 }
-
-type StudentScore struct {
-	ID    uint `json:"id"`
-	Score uint `json:"score"`
-}
-
-type StudentEmail struct {
-	ID    uint   `json:"id"`
-	Email string `json:"email"`
-}
