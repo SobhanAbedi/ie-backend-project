@@ -1,15 +1,19 @@
 package controller
 
 import (
+	"encoding/csv"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
+	"github.com/xuri/excelize/v2"
 	"ie-backend-project/common"
 	"ie-backend-project/handler"
 	"ie-backend-project/mailer"
 	"ie-backend-project/model"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
@@ -65,7 +69,7 @@ func (h Controller) NewCourse(c echo.Context) error {
 	bindErr := c.Bind(course)
 	parseErr := h.v.Struct(course)
 	if bindErr != nil || parseErr != nil {
-		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Course Json, All the course fields are provided"})
+		return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad Course json, All the course fields should be provided"})
 	}
 
 	res, err := h.ch.AddCourse(*course)
@@ -77,6 +81,77 @@ func (h Controller) NewCourse(c echo.Context) error {
 	}
 	fmt.Println("Added", course)
 	return c.JSON(http.StatusCreated, common.ID{ID: res})
+}
+
+func (h Controller) UploadCourses(c echo.Context) error {
+	fType := c.Request().Header.Get("Content-Type")
+	fmt.Println(fType)
+	body := c.Request().Body
+	courses := new(model.Courses)
+	if fType == "application/xml" {
+		xmlFile, err := ioutil.ReadAll(body)
+		if err != nil {
+			fmt.Println(err)
+			return c.JSON(http.StatusBadRequest, common.Error{Note: "Couldn't read the sent file"})
+		}
+		if err := xml.Unmarshal(xmlFile, courses); err != nil {
+			return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad XML file format"})
+		}
+	} else if fType == "text/csv" || fType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
+		var lines [][]string
+		if fType == "text/csv" {
+			var err error
+			lines, err = csv.NewReader(body).ReadAll()
+			if err != nil {
+				fmt.Println(err)
+				return c.JSON(http.StatusBadRequest, common.Error{Note: "Couldn't read the sent file"})
+			}
+
+		} else {
+			excelFile, err := excelize.OpenReader(body)
+			if err != nil {
+				fmt.Println(err)
+				return c.JSON(http.StatusBadRequest, common.Error{Note: "Couldn't read the sent file"})
+			}
+			lines, err = excelFile.GetRows("Sheet1")
+			if err != nil {
+				fmt.Println(err)
+				return c.JSON(http.StatusBadRequest, common.Error{Note: "Bad excel file format. Data should be in Sheet1"})
+			}
+		}
+		if len(lines) < 2 {
+			return c.JSON(http.StatusBadRequest, common.Error{Note: "CSV file should be at least two lines including header list"})
+		}
+		if lines[0][0] != "name" || lines[0][1] != "instructor" {
+			return c.JSON(http.StatusBadRequest, common.Error{Note: "Invalid CSV header line for adding courses"})
+		}
+		courses.Courses = make([]model.Course, len(lines)-1)
+		for i, line := range lines[1:] {
+			courses.Courses[i] = model.Course{Name: line[0], Instructor: line[1]}
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, common.Error{Note: "Supported media types are: CSV, excel, XML"})
+	}
+
+	r := common.Results{Results: make([]interface{}, len(courses.Courses))}
+	for i, course := range courses.Courses {
+		if err := h.v.Struct(course); err != nil {
+			r.Results[i] = common.Error{Note: "Bad Course line, All the course fields should be provided"}
+			continue
+		}
+		res, err := h.ch.AddCourse(course)
+		if err != nil {
+			if errors.Is(err, common.DuplicateCourseError) {
+				r.Results[i] = common.Error{Note: "Course Already Exists"}
+				continue
+			}
+			r.Results[i] = common.Error{Note: "Couldn't add course"}
+			continue
+		}
+		fmt.Println("Added", course)
+		r.Results[i] = common.ID{ID: res}
+	}
+	return c.JSON(http.StatusOK, r)
 }
 
 func (h Controller) GetCourse(c echo.Context) error {

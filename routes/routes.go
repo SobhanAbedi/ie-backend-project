@@ -22,7 +22,6 @@ func NewRouter(port uint, basePath string, courseHandler *handler.CourseHandler,
 	e.POST(basePath+"/register", c.Register)
 	e.POST(basePath+"/login", c.Login)
 	e.POST(basePath+"/logout", c.Logout)
-
 	cg := e.Group(basePath + "/course")
 	sg := e.Group(basePath + "/student")
 	config := middleware.JWTConfig{
@@ -36,6 +35,7 @@ func NewRouter(port uint, basePath string, courseHandler *handler.CourseHandler,
 	cg.POST("/delete", c.DeleteCourse)
 	cg.POST("/announce", c.AnnounceCourseResults)
 	cg.POST("/update/instructor", c.UpdateCourseInstructor)
+	cg.POST("/upload", c.UploadCourses)
 	cg.GET("/:id", c.GetCourse)
 	cg.GET("/:id/students", c.GetCourseStudents)
 	sg.POST("/new", c.NewStudent)
